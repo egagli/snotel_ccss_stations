@@ -1,0 +1,23 @@
+name: Update CSV Files
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs at 00:00 UTC every day
+
+jobs:
+  update_csv:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+
+    - name: Update CSV files
+      run: # ../../snotel_tools/update_csv_files.py
+    - name: Commit and push if there are changes
+      run: |
+        git config --global user.email "egagli@uw.edu"
+        git config --global user.name "Eric Gagliano"
+        git add -A
+        git diff --staged --exit-code || git commit -m "Auto update CSV files"
+        git push

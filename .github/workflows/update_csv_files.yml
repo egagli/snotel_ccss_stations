@@ -13,6 +13,12 @@ jobs:
     - name: Check out repository
       uses: actions/checkout@v3
 
+    - name: Install Conda environment with Micromamba
+      uses: mamba-org/setup-micromamba@v1
+      with:
+        cache-environment: true
+        environment-file: environment.yml
+
     - name: Update CSV files
       run: python ./snotel_tools/update_csv_files.py
     - name: Commit and push if there are changes

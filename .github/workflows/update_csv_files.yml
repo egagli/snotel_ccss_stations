@@ -20,7 +20,9 @@ jobs:
         environment-file: environment.yml
 
     - name: Update CSV files
-      run: ./snotel_tools/update_csv_files.py
+      run: |
+        micromamba activate snotel
+        ./snotel_tools/update_csv_files.py
     - name: Commit and push if there are changes
       run: |
         git config --global user.email "egagli@uw.edu"

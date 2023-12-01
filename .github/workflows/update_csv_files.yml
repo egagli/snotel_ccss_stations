@@ -1,13 +1,19 @@
 name: Update CSV Files
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # Runs at 00:00 UTC every day
-  workflow_dispatch:
+
+permissions:
+   contents: write
 
 jobs:
   update_csv:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
 
     steps:
     - name: Check out repository
@@ -21,8 +27,8 @@ jobs:
 
     - name: Update CSV files
       run: |
-        micromamba activate snotel
         ./snotel_tools/update_csv_files.py
+        
     - name: Commit and push if there are changes
       run: |
         git config --global user.email "egagli@uw.edu"

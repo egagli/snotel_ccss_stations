@@ -12,4 +12,3 @@ dependencies:
   - mgrs
   - matplotlib-base
   - pandas
-  - geopandas

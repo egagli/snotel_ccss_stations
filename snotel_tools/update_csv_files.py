@@ -1,4 +1,4 @@
-#!/usr/bin/env snotel
+#!/usr/bin/env python
 
 
 import pandas as pd

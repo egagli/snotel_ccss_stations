@@ -20,7 +20,7 @@ jobs:
         environment-file: environment.yml
 
     - name: Update CSV files
-      run: python ./snotel_tools/update_csv_files.py
+      run: ./snotel_tools/update_csv_files.py
     - name: Commit and push if there are changes
       run: |
         git config --global user.email "egagli@uw.edu"

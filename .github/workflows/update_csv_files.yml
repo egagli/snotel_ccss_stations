@@ -13,7 +13,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Update CSV files
-      run: ../../snotel_tools/update_csv_files.py
+      run: python ../../snotel_tools/update_csv_files.py
     - name: Commit and push if there are changes
       run: |
         git config --global user.email "egagli@uw.edu"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+print('starting csv update.')
 
 import pandas as pd
 import datetime
@@ -9,10 +10,13 @@ import snotel_tools
 import glob
 import re
 
+print('imports look good.')
+
 today = datetime.datetime.today().strftime('%Y-%m-%d')
 
-
 fns = glob.glob('../data/*.csv')
+
+print('files found.')
 
 for fn in fns:
     

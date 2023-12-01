@@ -12,3 +12,4 @@ dependencies:
   - mgrs
   - matplotlib-base
   - pandas
+  - tqdm

@@ -9,6 +9,8 @@ import fsspec
 import datetime
 import mgrs
 import shapely
+import os
+import tqdm
 
 wsdl_url = 'https://hydroportal.cuahsi.org/Snotel/cuahsi_1_1.asmx?WSDL'
 today = datetime.datetime.today().strftime('%Y-%m-%d')
@@ -72,7 +74,7 @@ def all_snotel_sites(from_ulmo=False):
         sites_gdf = gpd.GeoDataFrame(sites_gdf.drop(columns='geometry'), geometry=geometry)
     
     else:
-        sites_gdf = gpd.read_file('../data/snotel-sites.geojson').set_index('code')
+        sites_gdf = gpd.read_file('data/snotel-sites.geojson').set_index('code')
         
     return sites_gdf 
 
@@ -152,16 +154,17 @@ def construct_daily_dataframe(sitecode, start_date='1900-01-01', end_date=today)
 
 
 
-def download_snotel_data_csv():
+def download_snotel_data_csv(sites_gdf):
+    # do not run this
     for station in tqdm.tqdm(sites_gdf.index):
-        print(station)
         output = f'data/{station}.csv'
         if not os.path.exists(output):
             try:
                 df = construct_daily_dataframe(station,start_date='1900-01-01',end_date=today)
                 df.to_csv(output)
+                print(f'{station} complete!')
             except:
-                print('ERROR')
+                print(f'{station} failed :(')
 
 
 

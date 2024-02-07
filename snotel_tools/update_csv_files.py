@@ -3,6 +3,7 @@
 print('starting csv update.')
 
 import pandas as pd
+import geopandas as gpd
 import datetime
 import sys
 sys.path.append('../snotel_tools')
@@ -15,6 +16,7 @@ today = datetime.datetime.today().strftime('%Y-%m-%d')
 
 fns = glob.glob('data/*.csv')
 
+all_stations = gpd.read_file('all_stations.geojson')
 
 for fn in fns:
     
@@ -34,6 +36,10 @@ for fn in fns:
             new_data = snotel_tools.construct_daily_dataframe(sitecode,start_date=next_time,end_date=today)
 
         new_data.to_csv(fn, mode='a', index=True, header=False)
+        
+        all_stations.loc[all_stations.code == sitecode, 'endDate'] = next_time
+        all_stations.to_file('all_stations.geojson')
+        
         
     except:
         print(f'{sitecode} failed.')

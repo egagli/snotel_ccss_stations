@@ -28,7 +28,10 @@ for fn in fns:
         last_time = pd.read_csv(fn,index_col=0).index[-1]
         next_time = pd.to_datetime(last_time)+datetime.timedelta(days=1)
 
-        new_data = snotel_tools.construct_daily_dataframe(sitecode,start_date=next_time,end_date=today)
+        if len(sitecode) == 3:
+             new_data = snotel_tools.construct_daily_ccss_dataframe(sitecode,start_date=next_time,end_date=today)
+        else:
+            new_data = snotel_tools.construct_daily_dataframe(sitecode,start_date=next_time,end_date=today)
 
         new_data.to_csv(fn, mode='a', index=True, header=False)
         

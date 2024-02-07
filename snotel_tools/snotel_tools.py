@@ -168,8 +168,126 @@ def download_snotel_data_csv(sites_gdf):
 
 
 
+                
+                
+                
+def all_ccss_sites():
+    csv = 'http://cdec.water.ca.gov/dynamicapp/staSearch?sta=&sensor_chk=on&sensor=18&collect=NONE+SPECIFIED&dur=&active=&lon1=&lon2=&lat1=&lat2=&elev1=-5&elev2=99000&nearby=&basin=NONE+SPECIFIED&hydro=NONE+SPECIFIED&county=NONE+SPECIFIED&agency_num=160&display=sta'
+    response = requests.get(csv)
+    stations_df = pd.read_html(StringIO(response.content.decode('utf-8')))[0]
+    
+    stations_gdf = gpd.GeoDataFrame(stations_df, geometry=gpd.points_from_xy(stations_df['Longitude'], stations_df['Latitude']))
+    stations_gdf.crs = "EPSG:4326"
+
+    stations_gdf = stations_gdf.rename(columns={'ID':'code','Station Name':'name','Latitude':'latitude','Longitude':'longitude','County':'county','Operator':'operator'})
+    stations_gdf['elevation_m'] = stations_gdf['Elevation Feet'].astype(float)*0.3048
+    stations_gdf['name'] = stations_gdf['name'].str.title()
+    stations_gdf['county'] = stations_gdf['county'].str.title()
+    stations_gdf['longitude'] = stations_gdf['longitude'].astype(float)
+    stations_gdf['latitude'] = stations_gdf['latitude'].astype(float)
+    stations_gdf = stations_gdf.set_index('code')
+    
+    stations_gdf['state'] = 'California'
+    stations_gdf.loc[stations_gdf['county'] == 'State Of Nevada','state'] = 'Nevada'
+    stations_gdf.loc['49M','state'] = 'Nevada'
+    stations_gdf.loc['HYC','state'] = 'Nevada'
+    
+    stations_gdf = stations_gdf[stations_gdf['name'] != 'Snow Surveys Test Station']
+    
+    def get_mgrs_square(longitude, latitude):
+        c = mgrs.MGRS().toMGRS(latitude, longitude, MGRSPrecision=0)
+        return c
+
+    huc12 = ee.FeatureCollection('USGS/WBD/2017/HUC12')
+
+    def latlon_to_huc(geometry):
+        point = ee.Geometry.Point([geometry.x, geometry.y])  # Longitude, Latitude
+        feature = huc12.filterBounds(point).first()
+        huc12_code = feature.get('huc12').getInfo()
+        return huc12_code
+    
+
+    stations_gdf['mgrs'] = stations_gdf.apply(lambda x: get_mgrs_square(x.longitude, x.latitude), axis=1)
+    stations_gdf['HUC'] = stations_gdf['geometry'].apply(latlon_to_huc) 
+    
+    #dataset = 'GMBA_Inventory_v2.0_standard.zip' # full res
+    dataset = 'GMBA_Inventory_v2.0_standard_300.zip'
+    url = f'https://data.earthenv.org/mountains/standard/{dataset}'
+    gf_gmba = gpd.read_file('zip+'+url)
+
+    # mountain ranges within envelop of snotel sites
+    gf_gmba_crop = gf_gmba[gf_gmba.intersects(stations_gdf.unary_union.convex_hull)]
+
+    # https://geopandas.org/en/stable/docs/user_guide/mergingdata.html#spatial-joins
+    stations_gdf['mountainRange'] = stations_gdf.sjoin(gf_gmba_crop)['MapName'] # assigns NaN if point not in a mountainRange
+    
+    stations_gdf = stations_gdf[['name','elevation_m','latitude','longitude','county','state','HUC','mgrs','mountainRange','geometry']]
+    
+    
+    
+    return stations_gdf
 
 
+def ccss_fetch(sitecode, start_date='1900-01-01', end_date=today):
+    snow_vars = {'TAVG':30,'TMIN':32,'TMAX':31,'SNWD':18,'WTEQ':82,'PRCPSA':45} #https://cdec.water.ca.gov/misc/senslist.html 
+
+    params = {
+        'Stations': f'{sitecode}',
+        'SensorNums': f'{",".join([str(x) for x in snow_vars.values()])}',
+        'dur_code': 'D',
+        'Start': f'{start_date}',
+        'End': f'{end_date}'}
+
+
+    response = requests.get('http://cdec.water.ca.gov/dynamicapp/req/CSVDataServlet', params=params)
+    data = pd.read_csv(StringIO(response.content.decode('utf-8')),on_bad_lines='skip')
+
+    # Convert DATE TIME to datetime and set as index along with SENSOR_NUMBER
+    data['datetime'] = pd.to_datetime(data['DATE TIME'])
+    data.set_index(['datetime', 'SENSOR_NUMBER'], inplace=True)
+
+    return data
+
+def construct_daily_ccss_dataframe(sitecode, start_date='1900-01-01', end_date=today):
+    '''write out parquet of all daily measurements'''
+
+    # Fetch all variables at once
+    df = ccss_fetch(sitecode, start_date=start_date, end_date=end_date)
+
+    # Pivot the DataFrame to get each sensor number as a separate column
+    df = df['VALUE'].unstack(level=-1)
+
+    # Rename columns and convert units
+    rename_dict = {30: 'TAVG', 32: 'TMIN', 31: 'TMAX', 18: 'SNWD', 82: 'WTEQ', 45: 'PRCPSA'}
+    for sensor_num, new_name in rename_dict.items():
+        if sensor_num in df.columns:
+            df[new_name] = pd.to_numeric(df[sensor_num], errors='coerce')
+            if new_name in ['TAVG', 'TMIN', 'TMAX']:
+                df[new_name] = (df[new_name] - 32) * 5/9  # Convert F to Celsius
+            elif new_name in ['SNWD', 'WTEQ', 'PRCPSA']:
+                df[new_name] /= 39.3701  # Convert inches to meters
+            df.drop(sensor_num, axis=1, inplace=True)
+        else:
+            df[new_name] = np.nan
+
+    return df.astype('float32').dropna(how='all')
+
+
+def download_ccss_data_csv(sites_gdf):
+    # do not run this
+    for station in tqdm.tqdm(sites_gdf.index):
+        output = f'data/{station}.csv'
+        if not os.path.exists(output):
+            try:
+                time.sleep(10)
+                df = construct_daily_ccss_dataframe(station,start_date='1900-01-01',end_date=today)
+                if len(df) > 10:
+                    df.to_csv(output)
+                    print(f'{station} complete!')
+                else:
+                    print(f'{station} failed, no data present in response!')
+            except:
+                print(f'{station} failed :(')
 
 
 

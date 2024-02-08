@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+print('starting csv update.')
+
+import pandas as pd
+import geopandas as gpd
+import datetime
+import sys
+sys.path.append('../snotel_ccss_stations')
+import snotel_ccss_stations
+import glob
+import re
+
+
+today = datetime.datetime.today().strftime('%Y-%m-%d')
+
+fns = glob.glob('data/*.csv')
+
+
+for fn in fns:
+    
+    all_stations = gpd.read_file('all_stations.geojson')
+
+    pattern = r"/(?P<filename>[^/.]+)\."
+    stationcode = re.search(pattern,fn).group('filename')
+        
+    print(f'working on {stationcode}...')    
+
+    try:
+
+        last_time = pd.read_csv(fn,index_col=0).index[-1]
+        next_time = pd.to_datetime(last_time)+datetime.timedelta(days=1)
+
+        if len(stationcode) == 3:
+             new_data = snotel_ccss_stations.construct_daily_ccss_dataframe(stationcode,start_date=next_time,end_date=today)
+        else:
+            new_data = snotel_ccss_stations.construct_daily_dataframe(stationcode,start_date=next_time,end_date=today)
+
+        new_data.to_csv(fn, mode='a', index=True, header=False)
+        
+        all_stations.loc[all_stations.code == stationcode, 'endDate'] = next_time
+        all_stations.to_file('all_stations.geojson')
+        
+        
+    except:
+        print(f'{stationcode} failed.')
+
+
+
+
+
+
+
+
+
+
+
+

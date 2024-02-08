@@ -16,10 +16,11 @@ today = datetime.datetime.today().strftime('%Y-%m-%d')
 
 fns = glob.glob('data/*.csv')
 
-all_stations = gpd.read_file('all_stations.geojson')
 
 for fn in fns:
     
+    all_stations = gpd.read_file('all_stations.geojson')
+
     pattern = r"/(?P<filename>[^/.]+)\."
     sitecode = re.search(pattern,fn).group('filename')
         

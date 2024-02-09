@@ -15,10 +15,10 @@ import tqdm
 import requests
 import ee
 from io import StringIO
+import time
 
 wsdl_url = 'https://hydroportal.cuahsi.org/Snotel/cuahsi_1_1.asmx?WSDL'
 today = datetime.datetime.today().strftime('%Y-%m-%d')
-huc12 = ee.FeatureCollection('USGS/WBD/2017/HUC12')
 
 
 def comments2dict(comment):    
@@ -34,6 +34,7 @@ def get_mgrs_square(longitude, latitude):
     return c
 
 def latlon_to_huc(geometry):
+    huc12 = ee.FeatureCollection('USGS/WBD/2017/HUC12')
     point = ee.Geometry.Point([geometry.x, geometry.y])  # Longitude, Latitude
     feature = huc12.filterBounds(point).first()
     huc12_code = feature.get('huc12').getInfo()

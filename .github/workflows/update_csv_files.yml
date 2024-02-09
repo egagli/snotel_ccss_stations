@@ -26,7 +26,7 @@ jobs:
         environment-file: environment.yml
 
     - name: Update CSV files
-      run: ./snotel_tools/update_csv_files.py
+      run: ./snotel_ccss_stations/update_csv_files.py
         
     - name: Commit and push if there are changes
       run: |

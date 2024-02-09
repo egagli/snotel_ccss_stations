@@ -24,13 +24,12 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 
 ### Check out the [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb) notebook for examples
 
-heading
 
-station locations plot
+![p1](https://github.com/egagli/snotel_ccss_stations/assets/67975937/348e5b99-20e6-4952-9e39-0e4ceceae9e7)
+![p2](https://github.com/egagli/snotel_ccss_stations/assets/67975937/7d75b393-6bf7-47b0-adad-986217553b5b)
+![p3](https://github.com/egagli/snotel_ccss_stations/assets/67975937/5a12e7f4-c384-4890-846c-4c7796040d71)
+![p4](https://github.com/egagli/snotel_ccss_stations/assets/67975937/54c70faa-66df-4f97-bf4a-3306bfa510ff)
 
-paradise snotel plot
-
-CCSS plot
 
 
 

@@ -29,22 +29,7 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 ![p2](https://github.com/egagli/snotel_ccss_stations/assets/67975937/7d75b393-6bf7-47b0-adad-986217553b5b)
 ![p3](https://github.com/egagli/snotel_ccss_stations/assets/67975937/5a12e7f4-c384-4890-846c-4c7796040d71)
 ![p4](https://github.com/egagli/snotel_ccss_stations/assets/67975937/54c70faa-66df-4f97-bf4a-3306bfa510ff)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+![p5](https://github.com/egagli/snotel_ccss_stations/assets/67975937/473bbd45-3e98-41b3-b9ab-dbf329ef3841)
 
 
 

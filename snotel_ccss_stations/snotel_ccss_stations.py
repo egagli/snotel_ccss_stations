@@ -148,7 +148,6 @@ def construct_daily_dataframe(stationcode, start_date='1900-01-01', end_date=tod
     daily_vars = [x for x in station_info.keys() if x.endswith('_D')]
     
     
-    # # convert inches to meters
     df = snotel_fetch(stationcode, variablecode='TAVG_D', start_date=start_date, end_date=end_date)
     name = 'TAVG'
     df = df.rename(columns={'value':name})[name].to_frame()
@@ -157,7 +156,7 @@ def construct_daily_dataframe(stationcode, start_date='1900-01-01', end_date=tod
         tmp = snotel_fetch(stationcode, variablecode=var, start_date=start_date, end_date=end_date)
         name = var[:-2]
         tmp = tmp.rename(columns={'value':name})[name]
-        df = df.join(tmp)
+        df = df.join(tmp,how='outer')
     
     # Convert F to Celsius
     df = (df - 32) * 5/9
@@ -168,7 +167,7 @@ def construct_daily_dataframe(stationcode, start_date='1900-01-01', end_date=tod
         name = var[:-2]
         tmp = tmp.rename(columns={'value':name})[name]
         tmp /= 39.3701
-        df = df.join(tmp)
+        df = df.join(tmp,how='outer')
 
     # Drop UTC timestamp since all 0, and add freq='D'
     df.index = df.index.tz_localize(None).normalize()

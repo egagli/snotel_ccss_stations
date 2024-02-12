@@ -25,11 +25,12 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 ### Check out the [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb) notebook for examples
 
 
-![p1](https://github.com/egagli/snotel_ccss_stations/assets/67975937/348e5b99-20e6-4952-9e39-0e4ceceae9e7)
-![p2](https://github.com/egagli/snotel_ccss_stations/assets/67975937/7d75b393-6bf7-47b0-adad-986217553b5b)
-![p3](https://github.com/egagli/snotel_ccss_stations/assets/67975937/5a12e7f4-c384-4890-846c-4c7796040d71)
-![p4](https://github.com/egagli/snotel_ccss_stations/assets/67975937/54c70faa-66df-4f97-bf4a-3306bfa510ff)
-![p5](https://github.com/egagli/snotel_ccss_stations/assets/67975937/473bbd45-3e98-41b3-b9ab-dbf329ef3841)
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/348e5b99-20e6-4952-9e39-0e4ceceae9e7" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/7d75b393-6bf7-47b0-adad-986217553b5b" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/5a12e7f4-c384-4890-846c-4c7796040d71" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/54c70faa-66df-4f97-bf4a-3306bfa510ff" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/50a401c8-2aec-4da7-932f-2a5b3401970a" width="1000">
+   
 
 
 
@@ -38,9 +39,6 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 
 
 
-
-
-
-Functions to automatically fetch and update SNOTEL data use [ulmo](https://github.com/ulmo-dev/ulmo). In this repository, I've adapted code from David Shean and Scott Henderson that utilizes ulmo to fetch SNOTEL data. Check out some of those codes out here:   
+Functions to automatically fetch and update SNOTEL data use [ulmo](https://github.com/ulmo-dev/ulmo). In this repository, I've adapted code from David Shean and Scott Henderson that utilizes ulmo to fetch SNOTEL data. Check out some of those codes here:   
 - https://snowex-2021.hackweek.io/tutorials/geospatial/SNOTEL_query.html   
 - https://github.com/scottyhq/snotel   

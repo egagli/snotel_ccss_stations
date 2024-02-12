@@ -1,6 +1,6 @@
 # Pull daily SNOTEL and CCSS station data from auto-updating CSVs  
 **Eric Gagliano (egagli@uw.edu)**   
-**Updated: February 8th, 2024**
+**Updated: February 12th, 2024**
 
 A repository to make SNOTEL and CCSS station (daily) data a little easier to handle. Note that you do not need to clone or install this repo, you simply need pandas and geopandas to pull data contained in this repo. No confusing / hard to use APIs and download functions!
 
@@ -14,6 +14,7 @@ This repository hosts:
 ### Create geodataframe of all stations
 ```python
 all_stations_gdf = gpd.read_file('https://raw.githubusercontent.com/egagli/snotel_ccss_stations/main/all_stations.geojson').set_index('code')
+all_stations_gdf = all_stations_gdf[all_stations_gdf['csvData']==True]
 ```
 
 ### Read station data given a station code

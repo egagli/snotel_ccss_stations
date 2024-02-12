@@ -56,6 +56,6 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 
 
 
-Functions to automatically fetch and update snotel data use [ulmo](https://github.com/ulmo-dev/ulmo). I adpated code that utilizes ulmo to fetch SNOTEL data from David Shean and Scott Henderson check their codes out here: 
-https://snowex-2021.hackweek.io/tutorials/geospatial/SNOTEL_query.html
-https://github.com/scottyhq/snotel
+Functions to automatically fetch and update SNOTEL data use [ulmo](https://github.com/ulmo-dev/ulmo). In this repository, I've adapted code from David Shean and Scott Henderson that utilizes ulmo to fetch SNOTEL data. Check out some of those codes out here:   
+- https://snowex-2021.hackweek.io/tutorials/geospatial/SNOTEL_query.html   
+- https://github.com/scottyhq/snotel   

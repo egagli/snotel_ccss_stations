@@ -43,3 +43,11 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 Functions to automatically fetch and update SNOTEL data use [ulmo](https://github.com/ulmo-dev/ulmo). In this repository, I've adapted code from David Shean and Scott Henderson that utilizes ulmo to fetch SNOTEL data. Check out some of those codes here:   
 - https://snowex-2021.hackweek.io/tutorials/geospatial/SNOTEL_query.html   
 - https://github.com/scottyhq/snotel   
+
+
+###TODO
+- FIX: autoupdate, sometimes only some variables are available at latest time... at next update, go back and try and get missing data
+- push up a zip file of CSVs
+- compare same station across all vars (make sure vars are equivalent, esp PRCPSA)
+   - can test at a couple sites both SNOTEL and CCSS report?
+- Remove CCSS “stations” that are actually snow courses

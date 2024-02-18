@@ -28,7 +28,9 @@ for fn in fns:
 
     try:
 
-        last_time = pd.read_csv(fn,index_col=0).index[-1]
+        existing_data = pd.read_csv(fn, index_col=0)
+        
+        last_time = existing_data.index[-3]
         next_time = pd.to_datetime(last_time)+datetime.timedelta(days=1)
 
         if len(stationcode) == 3:
@@ -36,7 +38,15 @@ for fn in fns:
         else:
             new_data = snotel_ccss_stations.construct_daily_dataframe(stationcode,start_date=next_time,end_date=today)
 
-        new_data.to_csv(fn, mode='a', index=True, header=False)
+        # Append the new data to the existing data
+        combined_data = existing_data.append(new_data)
+
+        # Drop any duplicate rows
+        combined_data = combined_data.drop_duplicates(keep='last')    
+
+        # Write the combined data back to the CSV
+        combined_data.to_csv(fn, index=True, header=False)
+        #new_data.to_csv(fn, mode='a', index=True, header=False)
         
         all_stations_gdf.loc[all_stations_gdf.code == stationcode, 'endDate'] = next_time
         all_stations_gdf.to_file('all_stations.geojson')

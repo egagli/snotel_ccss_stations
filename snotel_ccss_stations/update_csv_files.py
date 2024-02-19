@@ -30,13 +30,13 @@ for fn in fns:
 
         existing_data = pd.read_csv(fn, index_col=0)
         
-        last_time = existing_data.index[-3]
-        next_time = pd.to_datetime(last_time)+datetime.timedelta(days=1)
+        last_time = existing_data.index[-1]
+        next_time = pd.to_datetime(last_time)-datetime.timedelta(days=3)
 
         if len(stationcode) == 3:
             new_data = snotel_ccss_stations.construct_daily_ccss_dataframe(stationcode,start_date=next_time,end_date=today)
         else:
-            new_data = snotel_ccss_stations.construct_daily_dataframe(stationcode,start_date=next_time,end_date=today)
+            new_data = snotel_ccss_stations.construct_daily_snotel_dataframe(stationcode,start_date=next_time,end_date=today)
 
         # Append the new data to the existing data
         combined_data = existing_data.append(new_data)

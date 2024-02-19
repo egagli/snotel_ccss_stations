@@ -94,24 +94,6 @@ def all_snotel_stations(from_ulmo=False):
     return stations_gdf 
 
 
-def sort_closest_snotel_stations(aoi_geom,print_closest=False):
-    
-    if isinstance(aoi_geom,shapely.geometry.base.BaseGeometry):
-        aoi_gdf = gpd.GeoDataFrame(index=[0], crs='epsg:4326', geometry=[aoi_geom])
-    elif isinstance(aoi_geom,gpd.geodataframe.GeoDataFrame):
-        aoi_gdf = aoi_geom
-
-    stations_gdf = all_snotel_stations(from_ulmo=False)
-
-    stations_gdf_distances = stations_gdf
-    stations_gdf_distances['distance_km'] = stations_gdf_distances.to_crs(32611).distance(aoi_gdf.to_crs(32611).geometry[0])/1000
-    stations_gdf_distances = stations_gdf_distances.sort_values(by='distance_km')
-    
-    if print_closest:
-        print(f'The 5 closest snotel stations are {stations_gdf_distances.head()}')
-    
-    return stations_gdf_distances
-
 def get_variables(sitecode,print_vars=False):
     
     variables = ulmo.cuahsi.wof.get_site_info(wsdl_url, 'SNOTEL:'+sitecode)['series']
@@ -141,9 +123,7 @@ def snotel_fetch(stationcode, variablecode='SNWD_D', start_date='1900-01-01', en
     return values_df
 
 
-# Simply save a parquet timeseries with all values
-def construct_daily_dataframe(stationcode, start_date='1900-01-01', end_date=today):
-    '''write out parquet of all daily measurements'''
+def construct_daily_snotel_dataframe(stationcode, start_date='1900-01-01', end_date=today):
     station_info = ulmo.cuahsi.wof.get_site_info(wsdl_url, 'SNOTEL:'+stationcode)['series']
     daily_vars = [x for x in station_info.keys() if x.endswith('_D')]
     
@@ -171,6 +151,9 @@ def construct_daily_dataframe(stationcode, start_date='1900-01-01', end_date=tod
 
     # Drop UTC timestamp since all 0, and add freq='D'
     df.index = df.index.tz_localize(None).normalize()
+    
+    precision = {'TAVG':1,'TMIN':1,'TMAX':1,'SNWD':4,'WTEQ':4,'PRCPSA':4}
+    df = df.round(precision)
     return df.astype('float32')
 
 
@@ -180,7 +163,7 @@ def download_snotel_data_csv(stations_gdf):
         output = f'data/{station}.csv'
         if not os.path.exists(output):
             try:
-                df = construct_daily_dataframe(station,start_date='1900-01-01',end_date=today)
+                df = construct_daily_snotel_dataframe(station,start_date='1900-01-01',end_date=today)
                 df.to_csv(output)
                 print(f'{station} complete!')
             except:
@@ -195,7 +178,7 @@ def all_ccss_stations():
 # https://cdec.water.ca.gov/snow/current/snow/
 # https://cdec.water.ca.gov/reportapp/javareports?name=SnowSensors
 # adpated from https://github.com/rgzn/SnowSurvey/blob/master/SensorScraper.r
-    csv = 'http://cdec.water.ca.gov/dynamicapp/staSearch?sta=&sensor_chk=on&sensor=18&collect=NONE+SPECIFIED&dur=&active=&lon1=&lon2=&lat1=&lat2=&elev1=-5&elev2=99000&nearby=&basin=NONE+SPECIFIED&hydro=NONE+SPECIFIED&county=NONE+SPECIFIED&agency_num=160&display=sta'
+    csv = 'http://cdec.water.ca.gov/dynamicapp/staSearch?sta=&sensor_chk=on&sensor=82&collect=NONE+SPECIFIED&dur=&active=&lon1=&lon2=&lat1=&lat2=&elev1=-5&elev2=99000&nearby=&basin=NONE+SPECIFIED&hydro=NONE+SPECIFIED&county=NONE+SPECIFIED&agency_num=160&display=sta'
     response = requests.get(csv)
     stations_df = pd.read_html(StringIO(response.content.decode('utf-8')))[0]
     
@@ -216,7 +199,14 @@ def all_ccss_stations():
     stations_gdf.loc['HYC','state'] = 'Nevada'
     
     stations_gdf = stations_gdf[stations_gdf['name'] != 'Snow Surveys Test Station']
+ 
+
+    csv = 'https://cdec.water.ca.gov/misc/SnowSensors.html'
+    response = requests.get(csv)
+    active_snow_stations_df = pd.read_html(StringIO(response.content.decode('utf-8')))[0]
+    active_snow_stations_df = active_snow_stations_df[active_snow_stations_df.nunique(axis=1) > 1]
     
+    stations_gdf = stations_gdf[stations_gdf.index.isin(active_snow_stations_df.ID)]
 
 
     stations_gdf['mgrs'] = stations_gdf.apply(lambda x: get_mgrs_square(x.longitude, x.latitude), axis=1)
@@ -263,8 +253,6 @@ def all_ccss_stations():
     
     stations_gdf = stations_gdf[['name','elevation_m','latitude','longitude','county','state','HUC','mgrs','mountainRange','beginDate','endDate','geometry']]
     
-    
-    
     return stations_gdf
 
 
@@ -289,7 +277,6 @@ def ccss_fetch(stationcode, start_date='1900-01-01', end_date=today):
     return data
 
 def construct_daily_ccss_dataframe(stationcode, start_date='1900-01-01', end_date=today):
-    '''write out parquet of all daily measurements'''
 
     # Fetch all variables at once
     df = ccss_fetch(stationcode, start_date=start_date, end_date=end_date)
@@ -310,6 +297,9 @@ def construct_daily_ccss_dataframe(stationcode, start_date='1900-01-01', end_dat
         else:
             df[new_name] = np.nan
 
+    precision = {'TAVG':1,'TMIN':1,'TMAX':1,'SNWD':4,'WTEQ':4,'PRCPSA':4}
+    df = df.round(precision)
+    
     return df.astype('float32').dropna(how='all')
 
 

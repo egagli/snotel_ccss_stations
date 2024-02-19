@@ -41,14 +41,13 @@ for fn in fns:
             new_data = snotel_ccss_stations.construct_daily_snotel_dataframe(stationcode,start_date=next_time,end_date=today)
 
         # Append the new data to the existing data
-        combined_data = pd.concat([existing_data,new_data],axis=0)#existing_data.append(new_data)
+        combined_data = pd.concat([existing_data,new_data],axis=0)
 
         # Drop any duplicate rows
         combined_data = combined_data[~combined_data.index.duplicated(keep='last')]    
 
         # Write the combined data back to the CSV
         combined_data.to_csv(fn, index=True, header=False)
-        #new_data.to_csv(fn, mode='a', index=True, header=False)
 
         all_stations_gdf.loc[all_stations_gdf.code == stationcode, 'endDate'] = next_time
         all_stations_gdf.to_file('all_stations.geojson')
@@ -58,7 +57,7 @@ for fn in fns:
         print(f'{stationcode} failed.')
 
         
-os.system('tar -czvf data/all_station_data.tar.gz data/*.csv')
+#os.system('tar -czvf data/all_station_data.tar.gz data/*.csv')
 
 
 

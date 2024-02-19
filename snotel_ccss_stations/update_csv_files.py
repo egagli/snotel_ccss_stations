@@ -58,9 +58,7 @@ for fn in fns:
         print(f'{stationcode} failed.')
 
         
-os.system('rm data/all_station_data.zip')
-os.system('zip data/all_station_data.zip data/*.csv')
-
+os.system('tar -czvf data/all_station_data.tar.gz data/*.csv')
 
 
 

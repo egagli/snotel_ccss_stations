@@ -149,12 +149,15 @@ def construct_daily_snotel_dataframe(stationcode, start_date='1900-01-01', end_d
         tmp /= 39.3701
         df = df.join(tmp,how='outer')
 
-    # Drop UTC timestamp since all 0, and add freq='D'
-    df.index = df.index.tz_localize(None).normalize()
-    
+        
+        
     precision = {'TAVG':1,'TMIN':1,'TMAX':1,'SNWD':4,'WTEQ':4,'PRCPSA':4}
     df = df.round(precision)
-    return df.astype('float32')
+    
+    
+    # Drop UTC timestamp since all 0, and add freq='D'
+    df.index = df.index.tz_localize(None).normalize()
+    return df
 
 
 def download_snotel_data_csv(stations_gdf):
@@ -170,10 +173,7 @@ def download_snotel_data_csv(stations_gdf):
                 print(f'{station} failed :(')
 
 
-# CCSS functions
-                
-                
-                
+# CCSS functions       
 def all_ccss_stations():
 # https://cdec.water.ca.gov/snow/current/snow/
 # https://cdec.water.ca.gov/reportapp/javareports?name=SnowSensors
@@ -300,7 +300,7 @@ def construct_daily_ccss_dataframe(stationcode, start_date='1900-01-01', end_dat
     precision = {'TAVG':1,'TMIN':1,'TMAX':1,'SNWD':4,'WTEQ':4,'PRCPSA':4}
     df = df.round(precision)
     
-    return df.astype('float32').dropna(how='all')
+    return df.dropna(how='all')
 
 
 def download_ccss_data_csv(stations_gdf):

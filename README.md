@@ -45,9 +45,8 @@ Functions to automatically fetch and update SNOTEL data use [ulmo](https://githu
 - https://github.com/scottyhq/snotel   
 
 
-###TODO
+### TODO
 - FIX: autoupdate, sometimes only some variables are available at latest time... at next update, go back and try and get missing data
 - push up a zip file of CSVs
-- compare same station across all vars (make sure vars are equivalent, esp PRCPSA)
-   - can test at a couple sites both SNOTEL and CCSS report?
-- Remove CCSS “stations” that are actually snow courses
+- Calculate some variable equivalent of PRCPSA for CCSS stations
+    - seems like only accumulated precip available

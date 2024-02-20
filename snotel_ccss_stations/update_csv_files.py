@@ -47,7 +47,7 @@ for fn in fns:
         combined_data = combined_data[~combined_data.index.duplicated(keep='last')]    
 
         # Write the combined data back to the CSV
-        combined_data.to_csv(fn, index=True, header=False)
+        combined_data.to_csv(fn, index=True, header=True)
 
         all_stations_gdf.loc[all_stations_gdf.code == stationcode, 'endDate'] = next_time
         all_stations_gdf.to_file('all_stations.geojson')

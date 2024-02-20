@@ -48,12 +48,14 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 
 
 
+## Acknowledgments
 
-
-
-Functions to automatically fetch and update SNOTEL data use [ulmo](https://github.com/ulmo-dev/ulmo). In this repository, I've adapted code from David Shean and Scott Henderson that utilizes ulmo to fetch SNOTEL data. Check out some of those codes here:   
-- https://snowex-2021.hackweek.io/tutorials/geospatial/SNOTEL_query.html   
-- https://github.com/scottyhq/snotel   
+This repository builds on the work of a lot of great scientists and coders! Of note:
+- The idea for this repo originated while using Scott Henderson's [snotel](https://github.com/scottyhq/snotel) repository and recognizing the value of having SNOTEL data staged somehow. I've also adapted Scott's code to create the all_stations.geojson
+- I use Emilio Mayorga's [ulmo](https://github.com/ulmo-dev/ulmo) underneath the hood to fetch SNOTEL data
+- I've adapated code from David Shean's [SnowEx Hackweek 2021 SNOTEL tutorial](https://snowex-2021.hackweek.io/tutorials/geospatial/SNOTEL_query.html) to use ulmo to pull SNOTEL data, and also adapted one of his plot ideas in the example notebook
+- Github user rgzn for their [SnowSurvey](https://github.com/rgzn/SnowSurvey/tree/master) repo from which I took inspiration for querying the CCSS stations
+- NRCS for the SNOTEL network, and CCSS for theirs
 
 
 ## To do list:

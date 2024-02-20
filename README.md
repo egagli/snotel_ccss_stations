@@ -1,13 +1,24 @@
 # Pull daily SNOTEL and CCSS station data from auto-updating CSVs  
 **Eric Gagliano (egagli@uw.edu)**   
-**Updated: February 12th, 2024**
+**Updated: February 19th, 2024**
 
-A repository to make SNOTEL and CCSS station (daily) data a little easier to handle. Note that you do not need to clone or install this repo, you simply need pandas and geopandas to pull data contained in this repo. No confusing / hard to use APIs and download functions!
+A repository to make SNOTEL and CCSS station (daily) data a little easier to handle. Note that you do not need to clone or install this repo, you simply need pandas and geopandas to read data contained in this repo (or you can just download the CSVs). No confusing / hard to use APIs and download functions! Data is automatically updated daily via a github action.
 
-This repository hosts:
-- a geojson of all SNOTEL and CCSS stations [all_stations.geojson](https://github.com/egagli/snotel_ccss_stations/blob/main/all_stations.geojson)
-- a data folder containing a CSV for each station with daily SNWD [m], WTEQ [m], PRCPSA [m], TMIN [C], TMAX [C], TAVG [C] (data automatically updated daily via a github action) 
-- an example notebook [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb)
+## Contents
+
+#### This repository hosts the following which are updated daily:
+- a geojson of all SNOTEL and CCSS stations: [all_stations.geojson](https://github.com/egagli/snotel_ccss_stations/blob/main/all_stations.geojson)
+- a data folder containing a CSV for each station with daily SNWD [m], WTEQ [m], PRCPSA [m], TMIN [C], TMAX [C], TAVG [C]: [data/](https://github.com/egagli/snotel_ccss_stations/tree/main/data)
+- a compressed file containing all CSVs: [data/all_station_data.tar.lzma](https://github.com/egagli/snotel_ccss_stations/blob/main/data/all_station_data.tar.lzma)  
+
+#### Example notebook:
+- a notebook showing different ways of reading the data, as well as some example use cases: [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb)
+
+#### The following utilities are included:
+- an admin notebook for resetting the data in this repository: [admin_first_time_setup.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/admin_first_time_setup.ipynb)
+- a file containing all the functions to acquire and clean the data: [snotel_ccss_stations/snotel_ccss_stations.py](https://github.com/egagli/snotel_ccss_stations/blob/main/snotel_ccss_stations/snotel_ccss_stations.py)
+- a script for updating the data: [snotel_ccss_stations/update_csv_files.py](https://github.com/egagli/snotel_ccss_stations/blob/main/snotel_ccss_stations/update_csv_files.py)
+- a github workflow file to automatically update the data via a github action: [.github/workflows/update_csv_files.yml](https://github.com/egagli/snotel_ccss_stations/blob/main/.github/workflows/update_csv_files.yml)
 
 ## Quickstart 
 
@@ -45,8 +56,6 @@ Functions to automatically fetch and update SNOTEL data use [ulmo](https://githu
 - https://github.com/scottyhq/snotel   
 
 
-### TODO
-- FIX: autoupdate, sometimes only some variables are available at latest time... at next update, go back and try and get missing data
-- push up a zip file of CSVs
+## To do list:
 - Calculate some variable equivalent of PRCPSA for CCSS stations
     - seems like only accumulated precip available

@@ -14,7 +14,7 @@ A repository to make SNOTEL and CCSS station (daily) data a little easier to han
 #### Example notebook:
 - a notebook showing different ways of reading the data, as well as some example use cases: [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb)
 
-#### The following utilities are included:
+#### Though you shouldn't need to access or edit any of these, I've included a list of the utilities used and general workflow for transparency:
 - an admin notebook for resetting the data in this repository: [admin_first_time_setup.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/admin_first_time_setup.ipynb)
 - a file containing all the functions to acquire and clean the data: [snotel_ccss_stations/snotel_ccss_stations.py](https://github.com/egagli/snotel_ccss_stations/blob/main/snotel_ccss_stations/snotel_ccss_stations.py)
 - a script for updating the data: [snotel_ccss_stations/update_csv_files.py](https://github.com/egagli/snotel_ccss_stations/blob/main/snotel_ccss_stations/update_csv_files.py)

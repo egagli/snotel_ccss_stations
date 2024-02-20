@@ -55,15 +55,5 @@ for fn in fns:
         
     except:
         print(f'{stationcode} failed.')
-
         
-#os.system('tar -czvf data/all_station_data.tar.gz data/*.csv')
-
-
-
-
-
-
-
-
-
+os.system('tar --lzma -cvf data/all_station_data.tar.lzma data/*.csv')

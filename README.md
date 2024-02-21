@@ -36,16 +36,14 @@ data_df = pd.read_csv(f'https://raw.githubusercontent.com/egagli/snotel_ccss_sta
 
 ### Check out the [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb) notebook for examples
 
-
-<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/348e5b99-20e6-4952-9e39-0e4ceceae9e7" width="1000">\
-<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/7d75b393-6bf7-47b0-adad-986217553b5b" width="1000">\
-<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/5a12e7f4-c384-4890-846c-4c7796040d71" width="1000">\
-<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/54c70faa-66df-4f97-bf4a-3306bfa510ff" width="1000">\
-<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/50a401c8-2aec-4da7-932f-2a5b3401970a" width="1000">
-   
+Here are some screenshots from the example notebook:
 
 
-
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/c78f6965-ce32-46ee-8dd7-c1c09b6d917a" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/4e05931b-b691-4512-95f0-cf0ed8342a59" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/4f7ddea3-8c0a-4cd1-bfdb-979edcb0beb5" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/4aea21ae-0b40-421e-bfab-7b63ae71425d" width="1000">\
+<img src="https://github.com/egagli/snotel_ccss_stations/assets/67975937/4f7fbcee-8b1b-411c-8956-4cab0362e683" width="1000">
 
 
 ## Acknowledgments

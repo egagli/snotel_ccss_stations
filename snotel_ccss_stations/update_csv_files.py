@@ -49,7 +49,7 @@ for fn in fns:
         # Write the combined data back to the CSV
         combined_data.to_csv(fn, index=True, header=True)
 
-        all_stations_gdf.loc[all_stations_gdf.code == stationcode, 'endDate'] = next_time
+        all_stations_gdf.loc[all_stations_gdf.code == stationcode, 'endDate'] = combined_data.index[-1].strftime('%Y-%m-%d')
         all_stations_gdf.to_file('all_stations.geojson')
         
         

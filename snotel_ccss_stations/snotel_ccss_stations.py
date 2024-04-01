@@ -271,8 +271,9 @@ def ccss_fetch(stationcode, start_date='1900-01-01', end_date=today):
     data = pd.read_csv(StringIO(response.content.decode('utf-8')),on_bad_lines='skip')
 
     # Convert DATE TIME to datetime and set as index along with SENSOR_NUMBER
-    data['datetime'] = pd.to_datetime(data['DATE TIME'])
+    data['datetime'] = pd.to_datetime(data['DATE TIME']).round('D')
     data.set_index(['datetime', 'SENSOR_NUMBER'], inplace=True)
+    data = data[data.index.notnull()]
 
     return data
 

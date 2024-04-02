@@ -268,7 +268,7 @@ def ccss_fetch(stationcode, start_date='1900-01-01', end_date=today):
 
 
     response = requests.get('http://cdec.water.ca.gov/dynamicapp/req/CSVDataServlet', params=params)
-    data = pd.read_csv(StringIO(response.content.decode('utf-8')),on_bad_lines='skip')
+    data = pd.read_csv(StringIO(response.content.decode('utf-8')),on_bad_lines='skip', header=0, index_col=False) # index_col bc of missing data issue that propogates #data = pd.read_csv(StringIO(response.content.decode('utf-8')),on_bad_lines='skip')
 
     # Convert DATE TIME to datetime and set as index along with SENSOR_NUMBER
     data['datetime'] = pd.to_datetime(data['DATE TIME']).round('D')

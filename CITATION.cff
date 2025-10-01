@@ -1,0 +1,35 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: snotel_ccss_stations
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Eric
+    family-names: Gagliano
+    email: egagli@uw.edu
+    affiliation: University of Washington
+    orcid: 'https://orcid.org/0000-0002-4362-6260'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.17246162
+repository-code: 'https://github.com/egagli/snotel_ccss_stations'
+abstract: >-
+  Easily access SNOTEL and CCSS station data daily without
+  cloning this repo. Requires only pandas and geopandas (or
+  just download the CSVs), with no complex APIs or download
+  functions.
+keywords:
+  - snotel
+  - automatic weather stations
+  - swe
+  - cdec
+  - ulmo
+  - ccss
+  - csv
+license: MIT
+version: v1.0
+date-released: '2024-02-19'

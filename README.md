@@ -9,7 +9,10 @@ A repository to make SNOTEL and CCSS station (daily) data a little easier to han
 #### This repository hosts the following which are updated daily:
 - a geojson of all SNOTEL and CCSS stations: [all_stations.geojson](https://github.com/egagli/snotel_ccss_stations/blob/main/all_stations.geojson)
 - a data folder containing a CSV for each station with daily SNWD [m], WTEQ [m], PRCPSA [m], TMIN [C], TMAX [C], TAVG [C]: [data/](https://github.com/egagli/snotel_ccss_stations/tree/main/data)
-- a compressed file containing all CSVs: [data/all_station_data.tar.lzma](https://github.com/egagli/snotel_ccss_stations/blob/main/data/all_station_data.tar.lzma)  
+- a compressed file containing all CSVs: [data/all_station_data.tar.lzma](https://github.com/egagli/snotel_ccss_stations/blob/main/data/all_station_data.tar.lzma)
+- a live interactive map showing current SWE % of normal for all stations (regenerated daily): [live_swe_map.html](https://htmlpreview.github.io/?https://github.com/egagli/snotel_ccss_stations/blob/main/live_swe_map.html)
+  - Red = below normal, white ≈ 100% of normal, blue = above normal
+  - Click any station marker for details (current SWE, historical median, % normal, elevation)
 
 #### Example notebook:
 - a notebook showing different ways of reading the data, as well as some example use cases: [example_usage.ipynb](https://github.com/egagli/snotel_ccss_stations/blob/main/example_usage.ipynb)

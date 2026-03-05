@@ -2,6 +2,7 @@
 
 print('Generating live SWE % normal map...')
 
+import html as html_lib
 import pandas as pd
 import geopandas as gpd
 import datetime
@@ -121,8 +122,33 @@ colormap = cm.LinearColormap(
     caption='SWE % of Normal  (values above 200% shown in darkest blue)',
 )
 
-# Center on western US
-m = folium.Map(location=[44, -113], zoom_start=5, tiles='CartoDB positron')
+# Center on western US — tiles=None so we can add named switchable basemaps
+m = folium.Map(location=[44, -113], zoom_start=5, tiles=None)
+
+# ── Basemap layers ─────────────────────────────────────────────────────────────
+
+folium.TileLayer(
+    tiles='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    name='CartoDB Light',
+    subdomains='abcd',
+    max_zoom=20,
+    show=True,
+).add_to(m)
+
+folium.TileLayer(
+    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    name='ESRI Satellite',
+    show=False,
+).add_to(m)
+
+folium.TileLayer(
+    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    attr='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    name='ESRI Topo',
+    show=False,
+).add_to(m)
 
 # Title overlay
 title_html = f'''
@@ -136,6 +162,12 @@ title_html = f'''
 </div>
 '''
 m.get_root().html.add_child(folium.Element(title_html))
+
+# Add Plotly.js and PapaParse to the page head
+m.get_root().header.add_child(folium.Element(
+    '<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>\n'
+    '<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>'
+))
 
 stations_added = 0
 for stationcode, data in results.items():
@@ -154,7 +186,12 @@ for stationcode, data in results.items():
     median_swe_cm = data['historical_median_m'] * 100
     data_date_str = data['data_date'].strftime('%Y-%m-%d')
 
+    station_name_safe = html_lib.escape(str(station['name']), quote=True)
+
     popup_html = (
+        f'<div data-station="{stationcode}" '
+        f'data-csvpath="data/{stationcode}.csv" '
+        f'data-stationname="{station_name_safe}">'
         f"<b>{station['name']}</b><br>"
         f"Code: {stationcode}<br>"
         f"Network: {station['network']}<br>"
@@ -166,6 +203,8 @@ for stationcode, data in results.items():
         f"Current SWE: {current_swe_cm:.1f} cm<br>"
         f"Historical median SWE: {median_swe_cm:.1f} cm<br>"
         f"<b>% of Normal: {pct:.0f}%</b>"
+        f'<div class="swe-chart" style="width:480px;height:280px;margin-top:8px;"></div>'
+        f'</div>'
     )
 
     folium.CircleMarker(
@@ -176,14 +215,219 @@ for stationcode, data in results.items():
         fill=True,
         fill_color=color,
         fill_opacity=0.85,
-        popup=folium.Popup(popup_html, max_width=270),
+        popup=folium.Popup(popup_html, max_width=520),
         tooltip=f"{station['name']}: {pct:.0f}% of normal",
     ).add_to(m)
     stations_added += 1
 
 colormap.add_to(m)
+folium.LayerControl(collapsed=False).add_to(m)
 
 print(f'Added {stations_added} station markers to map.')
+
+# ── Inject chart rendering JavaScript ─────────────────────────────────────────
+
+map_name = m.get_name()
+
+chart_js = '''<script>
+window.addEventListener('load', function() {
+  var mapObj = window['__MAP_NAME__'];
+  if (!mapObj) return;
+
+  var chartCache = {};
+
+  function dateToDoWY(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    var month = d.getMonth() + 1;
+    var year = d.getFullYear();
+    var wyStart = month >= 10
+      ? new Date(year, 9, 1)
+      : new Date(year - 1, 9, 1);
+    return Math.floor((d - wyStart) / 86400000) + 1;
+  }
+
+  function computeStats(values) {
+    if (!values.length) return null;
+    var n = values.length;
+    var mean = values.reduce(function(a, b) { return a + b; }, 0) / n;
+    var variance = values.reduce(function(a, b) { return a + (b - mean) * (b - mean); }, 0) / n;
+    var std = Math.sqrt(variance);
+    var sorted = values.slice().sort(function(a, b) { return a - b; });
+    var mid = Math.floor(sorted.length / 2);
+    var median = sorted.length % 2 === 1
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+    return { mean: mean, std: std, median: median, min: sorted[0], max: sorted[sorted.length - 1] };
+  }
+
+  function renderSWEChart(stationCode, csvPath, stationName, chartDiv) {
+    if (chartCache[stationCode]) {
+      Plotly.newPlot(chartDiv, chartCache[stationCode].traces, chartCache[stationCode].layout,
+        {responsive: true, displayModeBar: false});
+      return;
+    }
+
+    chartDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">Loading chart...</div>';
+
+    fetch(csvPath).then(function(resp) {
+      if (!resp.ok) throw new Error('CSV not available (HTTP ' + resp.status + ')');
+      return resp.text();
+    }).then(function(text) {
+      var parsed = Papa.parse(text, {header: true, dynamicTyping: true, skipEmptyLines: true});
+      var rows = parsed.data;
+
+      // Determine current water year start
+      var today = new Date();
+      var currentWYStart = today.getMonth() >= 9
+        ? new Date(today.getFullYear(), 9, 1)
+        : new Date(today.getFullYear() - 1, 9, 1);
+
+      var historical = {};
+      var currentWYX = [], currentWYY = [];
+
+      rows.forEach(function(row) {
+        var dateStr = row.datetime || row.date;
+        if (!dateStr || row.WTEQ === null || row.WTEQ === undefined || isNaN(row.WTEQ)) return;
+        var d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return;
+
+        var dowy = dateToDoWY(dateStr);
+        var sweVal = row.WTEQ * 100; // m → cm
+
+        if (d >= currentWYStart) {
+          currentWYX.push(dowy);
+          currentWYY.push(sweVal);
+        } else {
+          if (!historical[dowy]) historical[dowy] = [];
+          historical[dowy].push(sweVal);
+        }
+      });
+
+      var dowys = [], meanArr = [], stdHighArr = [], stdLowArr = [];
+      var medianArr = [], minArr = [], maxArr = [];
+
+      for (var i = 1; i <= 366; i++) {
+        var vals = historical[i] || [];
+        var stats = vals.length >= 3 ? computeStats(vals) : null;
+        dowys.push(i);
+        meanArr.push(stats ? parseFloat(stats.mean.toFixed(3)) : null);
+        stdHighArr.push(stats ? parseFloat((stats.mean + stats.std).toFixed(3)) : null);
+        stdLowArr.push(stats ? parseFloat(Math.max(0, stats.mean - stats.std).toFixed(3)) : null);
+        medianArr.push(stats ? parseFloat(stats.median.toFixed(3)) : null);
+        minArr.push(stats ? parseFloat(stats.min.toFixed(3)) : null);
+        maxArr.push(stats ? parseFloat(stats.max.toFixed(3)) : null);
+      }
+
+      var traces = [
+        // mean ±1 std shaded band (filled polygon)
+        {
+          x: dowys.concat(dowys.slice().reverse()),
+          y: stdHighArr.concat(stdLowArr.slice().reverse()),
+          fill: 'toself',
+          fillcolor: 'rgba(147,112,219,0.25)',
+          line: {color: 'transparent'},
+          name: 'mean \u00b11 std',
+          type: 'scatter',
+          hoverinfo: 'skip',
+          showlegend: true
+        },
+        // min
+        {
+          x: dowys, y: minArr,
+          mode: 'lines',
+          line: {color: 'red', width: 1.5},
+          name: 'min',
+          type: 'scatter',
+          connectgaps: false
+        },
+        // max
+        {
+          x: dowys, y: maxArr,
+          mode: 'lines',
+          line: {color: 'blue', width: 1.5},
+          name: 'max',
+          type: 'scatter',
+          connectgaps: false
+        },
+        // mean
+        {
+          x: dowys, y: meanArr,
+          mode: 'lines',
+          line: {color: 'purple', width: 1.5},
+          name: 'mean',
+          type: 'scatter',
+          connectgaps: false
+        },
+        // median
+        {
+          x: dowys, y: medianArr,
+          mode: 'lines',
+          line: {color: 'green', width: 1.5},
+          name: 'median',
+          type: 'scatter',
+          connectgaps: false
+        },
+        // current water year dots
+        {
+          x: currentWYX,
+          y: currentWYY,
+          mode: 'markers',
+          marker: {color: 'black', size: 5, symbol: 'circle'},
+          name: 'Current WY',
+          type: 'scatter'
+        }
+      ];
+
+      var layout = {
+        title: {text: stationName + ' \u2014 SWE by Day of Water Year', font: {size: 12}},
+        xaxis: {
+          title: 'Day of Water Year (Oct 1 = Day 1)',
+          range: [0, 366],
+          showgrid: true,
+          gridcolor: '#eee'
+        },
+        yaxis: {
+          title: 'SWE [cm]',
+          rangemode: 'tozero',
+          showgrid: true,
+          gridcolor: '#eee'
+        },
+        legend: {x: 0.01, y: 0.99, bgcolor: 'rgba(255,255,255,0.8)', font: {size: 11}},
+        margin: {l: 55, r: 10, t: 35, b: 45},
+        height: 280,
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+      };
+
+      chartCache[stationCode] = {traces: traces, layout: layout};
+      chartDiv.innerHTML = '';
+      Plotly.newPlot(chartDiv, traces, layout, {responsive: true, displayModeBar: false});
+
+    }).catch(function(err) {
+      chartDiv.innerHTML = '<div style="padding:10px;color:#c00;font-size:12px;">'
+        + 'Chart unavailable: ' + err.message
+        + '<br><small>Charts load when served over HTTP (e.g. GitHub Pages)</small></div>';
+    });
+  }
+
+  mapObj.on('popupopen', function(e) {
+    var el = e.popup.getElement();
+    if (!el) return;
+    var stationDiv = el.querySelector('[data-station]');
+    if (!stationDiv) return;
+
+    var stationCode = stationDiv.getAttribute('data-station');
+    var csvPath = stationDiv.getAttribute('data-csvpath');
+    var stationName = stationDiv.getAttribute('data-stationname');
+    var chartDiv = stationDiv.querySelector('.swe-chart');
+
+    if (!chartDiv || !stationCode || !csvPath) return;
+    renderSWEChart(stationCode, csvPath, stationName, chartDiv);
+  });
+});
+</script>'''.replace('__MAP_NAME__', map_name)
+
+m.get_root().html.add_child(folium.Element(chart_js))
 
 # ── Save ───────────────────────────────────────────────────────────────────────
 

@@ -12,6 +12,8 @@ import os
 import folium
 import branca.colormap as cm
 import numpy as np
+import matplotlib.cm as mplcm
+import matplotlib.colors as mcolors
 from tqdm import tqdm
 
 
@@ -24,38 +26,35 @@ def datetime_to_DOWY(date):
     return (date - start_of_water_year).days + 1
 
 
-def compute_pct_normal(df, today, current_dowy, min_years=5):
+def compute_pct_normal(df, today, current_dowy, column='WTEQ', min_years=5):
     """
-    Compute % of normal SWE for the most recent reading.
+    Compute % of normal for the most recent reading of the given column.
 
-    Returns (pct_normal, current_swe_m, historical_median_m, data_date) or None if invalid.
+    Returns (pct_normal, current_val, historical_median, data_date) or None if invalid.
     """
-    if 'WTEQ' not in df.columns:
+    if column not in df.columns:
         return None
 
-    # Get most recent valid WTEQ reading within last 7 days
-    recent = df.loc[df.index >= today - pd.Timedelta(days=7), 'WTEQ'].dropna()
+    recent = df.loc[df.index >= today - pd.Timedelta(days=7), column].dropna()
     if recent.empty:
         return None
-    current_swe = recent.iloc[-1]
+    current_val = recent.iloc[-1]
     data_date = recent.index[-1]
 
-    # Historical baseline: exclude current water year
     if today.month >= 10:
         current_wy_start = pd.Timestamp(year=today.year, month=10, day=1)
     else:
         current_wy_start = pd.Timestamp(year=today.year - 1, month=10, day=1)
 
-    historical = df.loc[df.index < current_wy_start, 'WTEQ'].dropna()
+    historical = df.loc[df.index < current_wy_start, column].dropna()
     if historical.empty:
         return None
 
-    # Add DOWY to historical data
     historical_with_dowy = historical.to_frame()
     historical_with_dowy['DOWY'] = historical_with_dowy.index.map(datetime_to_DOWY)
 
     dowy_vals = historical_with_dowy.loc[
-        historical_with_dowy['DOWY'] == current_dowy, 'WTEQ'
+        historical_with_dowy['DOWY'] == current_dowy, column
     ].dropna()
 
     if dowy_vals.count() < min_years:
@@ -63,16 +62,21 @@ def compute_pct_normal(df, today, current_dowy, min_years=5):
 
     historical_median = dowy_vals.median()
 
-    # Skip if historical median is zero (off-season or no-snow station at this time of year)
     if historical_median <= 0:
         return None
 
-    pct_normal = 100.0 * current_swe / historical_median
+    pct_normal = 100.0 * current_val / historical_median
 
     if not (0 <= pct_normal <= 2000):
         return None
 
-    return pct_normal, current_swe, historical_median, data_date
+    return pct_normal, current_val, historical_median, data_date
+
+
+def pct_to_color(pct):
+    """Map % of normal (0–200+) to a hex color using RdBu, centered at 100%."""
+    normed = min(pct, 200) / 200.0  # 0→0.0, 100→0.5, 200→1.0
+    return mcolors.to_hex(mplcm.RdBu(normed))
 
 
 # ── Setup ──────────────────────────────────────────────────────────────────────
@@ -82,12 +86,13 @@ current_dowy = datetime_to_DOWY(today)
 
 print(f'Today: {today.date()}  |  DOWY: {current_dowy}')
 
-# Load station metadata
 all_stations_gdf = gpd.read_file('all_stations.geojson').set_index('code')
 
-# ── Compute % normal for each station ─────────────────────────────────────────
+# ── Process all stations ───────────────────────────────────────────────────────
 
-results = {}
+results = {}       # stationcode → dict with SWE + SNWD stats
+station_info = {}  # stationcode → date range info (all CSVs)
+
 fns = glob.glob('data/*.csv')
 pattern = re.compile(r'/(?P<code>[^/.]+)\.csv$')
 
@@ -99,30 +104,55 @@ for fn in tqdm(fns, desc='Processing stations'):
 
     try:
         df = pd.read_csv(fn, index_col=0, parse_dates=True)
-        result = compute_pct_normal(df, today, current_dowy)
-        if result is not None:
-            pct_normal, current_swe, historical_median, data_date = result
-            results[stationcode] = {
-                'pct_normal': pct_normal,
-                'current_swe_m': current_swe,
-                'historical_median_m': historical_median,
-                'data_date': data_date,
+
+        # Date range for all stations that have a CSV
+        valid_dates = df.index[df[['WTEQ', 'SNWD']].notna().any(axis=1)]
+        date_start = valid_dates.min().strftime('%Y-%m-%d') if len(valid_dates) else None
+        date_end   = valid_dates.max().strftime('%Y-%m-%d') if len(valid_dates) else None
+        station_info[stationcode] = {'date_start': date_start, 'date_end': date_end}
+
+        swe_result  = compute_pct_normal(df, today, current_dowy, column='WTEQ')
+        snwd_result = compute_pct_normal(df, today, current_dowy, column='SNWD')
+
+        entry = {}
+        if swe_result:
+            pct, val, med, ddate = swe_result
+            entry['swe'] = {
+                'pct_normal': pct,
+                'current_cm': val * 100,
+                'median_cm': med * 100,
+                'data_date': ddate.strftime('%Y-%m-%d'),
+                'color': pct_to_color(pct),
             }
+        if snwd_result:
+            pct, val, med, ddate = snwd_result
+            entry['snwd'] = {
+                'pct_normal': pct,
+                'current_cm': val * 100,
+                'median_cm': med * 100,
+                'data_date': ddate.strftime('%Y-%m-%d'),
+                'color': pct_to_color(pct),
+            }
+        if entry:
+            results[stationcode] = entry
+
     except Exception as e:
         print(f'  {stationcode} failed: {e}')
 
-print(f'Successfully computed % normal for {len(results)} stations.')
+print(f'Processed {len(fns)} CSVs; {len(results)} with valid data.')
 
 # ── Build Folium map ───────────────────────────────────────────────────────────
 
+# RdBu colormap for legend (20 samples, vmin=0, vmax=200)
+_n = 20
+_rdbu_colors = [mcolors.to_hex(mplcm.RdBu(i / (_n - 1))) for i in range(_n)]
 colormap = cm.LinearColormap(
-    colors=['#8B0000', '#FF4500', '#FFA500', '#FFFF80', '#FFFFFF', '#ADD8E6', '#4169E1', '#00008B'],
+    colors=_rdbu_colors,
     vmin=0,
     vmax=200,
     caption='SWE % of Normal  (values above 200% shown in darkest blue)',
 )
 
-# Center on western US — tiles=None so we can add named switchable basemaps
 m = folium.Map(location=[44, -113], zoom_start=5, tiles=None)
 
 # ── Basemap layers ─────────────────────────────────────────────────────────────
@@ -150,7 +180,8 @@ folium.TileLayer(
     show=False,
 ).add_to(m)
 
-# Title overlay
+# ── Title overlay ──────────────────────────────────────────────────────────────
+
 title_html = f'''
 <div style="position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
             z-index: 1000; background: white; padding: 8px 16px;
@@ -163,30 +194,68 @@ title_html = f'''
 '''
 m.get_root().html.add_child(folium.Element(title_html))
 
-# Add Plotly.js and PapaParse to the page head
+# Variable selector toggle (bottom-center)
+toggle_html = '''
+<div id="variable-selector"
+     style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: white; padding: 7px 18px;
+            border: 1px solid #ccc; border-radius: 6px;
+            font-family: Arial, sans-serif; font-size: 13px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);">
+  <b>Show:</b>&nbsp;
+  <label style="cursor:pointer;">
+    <input type="radio" name="mapVariable" value="swe" checked> SWE
+  </label>
+  &nbsp;&nbsp;
+  <label style="cursor:pointer;">
+    <input type="radio" name="mapVariable" value="snwd"> Snow Depth
+  </label>
+</div>
+'''
+m.get_root().html.add_child(folium.Element(toggle_html))
+
+# CDN dependencies
 m.get_root().header.add_child(folium.Element(
     '<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>\n'
     '<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>'
 ))
 
-stations_added = 0
-for stationcode, data in results.items():
-    if stationcode not in all_stations_gdf.index:
-        continue
+# ── Add station markers ────────────────────────────────────────────────────────
 
-    station = all_stations_gdf.loc[stationcode]
+# Build JS data object in parallel with adding markers
+js_station_data_parts = []
+
+stations_with_data = 0
+stations_gray = 0
+
+for stationcode, station in all_stations_gdf.iterrows():
     lat = station.geometry.y
     lon = station.geometry.x
-
-    pct = data['pct_normal']
-    color_val = min(pct, 200)  # cap for colormap
-    color = colormap(color_val)
-
-    current_swe_cm = data['current_swe_m'] * 100
-    median_swe_cm = data['historical_median_m'] * 100
-    data_date_str = data['data_date'].strftime('%Y-%m-%d')
-
     station_name_safe = html_lib.escape(str(station['name']), quote=True)
+
+    has_data = stationcode in results
+    swe_data  = results[stationcode].get('swe')  if has_data else None
+    snwd_data = results[stationcode].get('snwd') if has_data else None
+
+    info = station_info.get(stationcode, {})
+    date_start = info.get('date_start', 'N/A')
+    date_end   = info.get('date_end', 'N/A')
+    date_range_str = f"{date_start} to {date_end}" if date_start else 'No data'
+
+    # Marker color: SWE by default, gray if no data
+    fill_color = swe_data['color'] if swe_data else '#808080'
+    fill_opacity = 0.85 if has_data else 0.55
+
+    # Popup: show both SWE and SNWD info
+    def fmt_row(label, d):
+        if d:
+            return (
+                f"<b>{label}:</b> {d['current_cm']:.1f} cm "
+                f"(median {d['median_cm']:.1f} cm, "
+                f"<b>{d['pct_normal']:.0f}% of normal</b>)<br>"
+                f"&nbsp;&nbsp;<small>data date: {d['data_date']}</small>"
+            )
+        return f"<b>{label}:</b> <i>insufficient data</i>"
 
     popup_html = (
         f'<div data-station="{stationcode}" '
@@ -198,13 +267,17 @@ for stationcode, data in results.items():
         f"State: {station.get('state', 'N/A')}<br>"
         f"Elevation: {station['elevation_m']:.0f} m<br>"
         f"Mountain Range: {station.get('mountainRange', 'N/A')}<br>"
+        f"Record: {date_range_str}<br>"
         f"<hr style='margin:4px 0'>"
-        f"Data date: {data_date_str}<br>"
-        f"Current SWE: {current_swe_cm:.1f} cm<br>"
-        f"Historical median SWE: {median_swe_cm:.1f} cm<br>"
-        f"<b>% of Normal: {pct:.0f}%</b>"
+        f"{fmt_row('SWE', swe_data)}<br>"
+        f"{fmt_row('Snow Depth', snwd_data)}"
         f'<div class="swe-chart" style="width:480px;height:280px;margin-top:8px;"></div>'
         f'</div>'
+    )
+
+    tooltip_text = (
+        f"{station['name']}: {swe_data['pct_normal']:.0f}% of normal (SWE)"
+        if swe_data else f"{station['name']}: no data"
     )
 
     folium.CircleMarker(
@@ -213,219 +286,214 @@ for stationcode, data in results.items():
         color='black',
         weight=1,
         fill=True,
-        fill_color=color,
-        fill_opacity=0.85,
+        fill_color=fill_color,
+        fill_opacity=fill_opacity,
         popup=folium.Popup(popup_html, max_width=520),
-        tooltip=f"{station['name']}: {pct:.0f}% of normal",
+        tooltip=tooltip_text,
     ).add_to(m)
-    stations_added += 1
+
+    if has_data:
+        stations_with_data += 1
+    else:
+        stations_gray += 1
+
+    # Accumulate JS data for this station
+    swe_js = (
+        f'{{"pct":{swe_data["pct_normal"]:.1f},"color":"{swe_data["color"]}",'
+        f'"tooltip":"{html_lib.escape(station["name"], quote=True)}: '
+        f'{swe_data["pct_normal"]:.0f}% of normal (SWE)"}}'
+        if swe_data else 'null'
+    )
+    snwd_js = (
+        f'{{"pct":{snwd_data["pct_normal"]:.1f},"color":"{snwd_data["color"]}",'
+        f'"tooltip":"{html_lib.escape(station["name"], quote=True)}: '
+        f'{snwd_data["pct_normal"]:.0f}% of normal (Snow Depth)"}}'
+        if snwd_data else 'null'
+    )
+    js_station_data_parts.append(
+        f'"{stationcode}":{{"swe":{swe_js},"snwd":{snwd_js}}}'
+    )
 
 colormap.add_to(m)
 folium.LayerControl(collapsed=False).add_to(m)
 
-print(f'Added {stations_added} station markers to map.')
+print(f'Added {stations_with_data} colored + {stations_gray} gray station markers.')
 
-# ── Inject chart rendering JavaScript ─────────────────────────────────────────
+# ── Inject JavaScript ──────────────────────────────────────────────────────────
 
 map_name = m.get_name()
+station_data_json = '{' + ','.join(js_station_data_parts) + '}'
 
-chart_js = '''<script>
-window.addEventListener('load', function() {
-  var mapObj = window['__MAP_NAME__'];
-  if (!mapObj) return;
-
-  var chartCache = {};
-
-  function dateToDoWY(dateStr) {
-    var d = new Date(dateStr + 'T00:00:00');
-    var month = d.getMonth() + 1;
-    var year = d.getFullYear();
-    var wyStart = month >= 10
-      ? new Date(year, 9, 1)
-      : new Date(year - 1, 9, 1);
-    return Math.floor((d - wyStart) / 86400000) + 1;
-  }
-
-  function computeStats(values) {
-    if (!values.length) return null;
-    var n = values.length;
-    var mean = values.reduce(function(a, b) { return a + b; }, 0) / n;
-    var variance = values.reduce(function(a, b) { return a + (b - mean) * (b - mean); }, 0) / n;
-    var std = Math.sqrt(variance);
-    var sorted = values.slice().sort(function(a, b) { return a - b; });
-    var mid = Math.floor(sorted.length / 2);
-    var median = sorted.length % 2 === 1
-      ? sorted[mid]
-      : (sorted[mid - 1] + sorted[mid]) / 2;
-    return { mean: mean, std: std, median: median, min: sorted[0], max: sorted[sorted.length - 1] };
-  }
-
-  function renderSWEChart(stationCode, csvPath, stationName, chartDiv) {
-    if (chartCache[stationCode]) {
-      Plotly.newPlot(chartDiv, chartCache[stationCode].traces, chartCache[stationCode].layout,
-        {responsive: true, displayModeBar: false});
-      return;
-    }
-
-    chartDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">Loading chart...</div>';
-
-    fetch(csvPath).then(function(resp) {
-      if (!resp.ok) throw new Error('CSV not available (HTTP ' + resp.status + ')');
-      return resp.text();
-    }).then(function(text) {
-      var parsed = Papa.parse(text, {header: true, dynamicTyping: true, skipEmptyLines: true});
-      var rows = parsed.data;
-
-      // Determine current water year start
-      var today = new Date();
-      var currentWYStart = today.getMonth() >= 9
-        ? new Date(today.getFullYear(), 9, 1)
-        : new Date(today.getFullYear() - 1, 9, 1);
-
-      var historical = {};
-      var currentWYX = [], currentWYY = [];
-
-      rows.forEach(function(row) {
-        var dateStr = row.datetime || row.date;
-        if (!dateStr || row.WTEQ === null || row.WTEQ === undefined || isNaN(row.WTEQ)) return;
-        var d = new Date(dateStr + 'T00:00:00');
-        if (isNaN(d.getTime())) return;
-
-        var dowy = dateToDoWY(dateStr);
-        var sweVal = row.WTEQ * 100; // m → cm
-
-        if (d >= currentWYStart) {
-          currentWYX.push(dowy);
-          currentWYY.push(sweVal);
-        } else {
-          if (!historical[dowy]) historical[dowy] = [];
-          historical[dowy].push(sweVal);
-        }
-      });
-
-      var dowys = [], meanArr = [], stdHighArr = [], stdLowArr = [];
-      var medianArr = [], minArr = [], maxArr = [];
-
-      for (var i = 1; i <= 366; i++) {
-        var vals = historical[i] || [];
-        var stats = vals.length >= 3 ? computeStats(vals) : null;
-        dowys.push(i);
-        meanArr.push(stats ? parseFloat(stats.mean.toFixed(3)) : null);
-        stdHighArr.push(stats ? parseFloat((stats.mean + stats.std).toFixed(3)) : null);
-        stdLowArr.push(stats ? parseFloat(Math.max(0, stats.mean - stats.std).toFixed(3)) : null);
-        medianArr.push(stats ? parseFloat(stats.median.toFixed(3)) : null);
-        minArr.push(stats ? parseFloat(stats.min.toFixed(3)) : null);
-        maxArr.push(stats ? parseFloat(stats.max.toFixed(3)) : null);
-      }
-
-      var traces = [
-        // mean ±1 std shaded band (filled polygon)
-        {
-          x: dowys.concat(dowys.slice().reverse()),
-          y: stdHighArr.concat(stdLowArr.slice().reverse()),
-          fill: 'toself',
-          fillcolor: 'rgba(147,112,219,0.25)',
-          line: {color: 'transparent'},
-          name: 'mean \u00b11 std',
-          type: 'scatter',
-          hoverinfo: 'skip',
-          showlegend: true
-        },
-        // min
-        {
-          x: dowys, y: minArr,
-          mode: 'lines',
-          line: {color: 'red', width: 1.5},
-          name: 'min',
-          type: 'scatter',
-          connectgaps: false
-        },
-        // max
-        {
-          x: dowys, y: maxArr,
-          mode: 'lines',
-          line: {color: 'blue', width: 1.5},
-          name: 'max',
-          type: 'scatter',
-          connectgaps: false
-        },
-        // mean
-        {
-          x: dowys, y: meanArr,
-          mode: 'lines',
-          line: {color: 'purple', width: 1.5},
-          name: 'mean',
-          type: 'scatter',
-          connectgaps: false
-        },
-        // median
-        {
-          x: dowys, y: medianArr,
-          mode: 'lines',
-          line: {color: 'green', width: 1.5},
-          name: 'median',
-          type: 'scatter',
-          connectgaps: false
-        },
-        // current water year dots
-        {
-          x: currentWYX,
-          y: currentWYY,
-          mode: 'markers',
-          marker: {color: 'black', size: 5, symbol: 'circle'},
-          name: 'Current WY',
-          type: 'scatter'
-        }
-      ];
-
-      var layout = {
-        title: {text: stationName + ' \u2014 SWE by Day of Water Year', font: {size: 12}},
-        xaxis: {
-          title: 'Day of Water Year (Oct 1 = Day 1)',
-          range: [0, 366],
-          showgrid: true,
-          gridcolor: '#eee'
-        },
-        yaxis: {
-          title: 'SWE [cm]',
-          rangemode: 'tozero',
-          showgrid: true,
-          gridcolor: '#eee'
-        },
-        legend: {x: 0.01, y: 0.99, bgcolor: 'rgba(255,255,255,0.8)', font: {size: 11}},
-        margin: {l: 55, r: 10, t: 35, b: 45},
-        height: 280,
-        plot_bgcolor: 'white',
-        paper_bgcolor: 'white'
-      };
-
-      chartCache[stationCode] = {traces: traces, layout: layout};
-      chartDiv.innerHTML = '';
-      Plotly.newPlot(chartDiv, traces, layout, {responsive: true, displayModeBar: false});
-
-    }).catch(function(err) {
-      chartDiv.innerHTML = '<div style="padding:10px;color:#c00;font-size:12px;">'
-        + 'Chart unavailable: ' + err.message
-        + '<br><small>Charts load when served over HTTP (e.g. GitHub Pages)</small></div>';
-    });
-  }
-
-  mapObj.on('popupopen', function(e) {
-    var el = e.popup.getElement();
-    if (!el) return;
-    var stationDiv = el.querySelector('[data-station]');
-    if (!stationDiv) return;
-
-    var stationCode = stationDiv.getAttribute('data-station');
-    var csvPath = stationDiv.getAttribute('data-csvpath');
-    var stationName = stationDiv.getAttribute('data-stationname');
-    var chartDiv = stationDiv.querySelector('.swe-chart');
-
-    if (!chartDiv || !stationCode || !csvPath) return;
-    renderSWEChart(stationCode, csvPath, stationName, chartDiv);
-  });
-});
-</script>'''.replace('__MAP_NAME__', map_name)
+chart_js = (
+    '<script>\n'
+    'window.stationData = ' + station_data_json + ';\n'
+    '</script>\n'
+    '<script>\n'
+    'window.addEventListener("load", function() {\n'
+    '  var mapObj = window["__MAP_NAME__"];\n'
+    '  if (!mapObj) return;\n'
+    '\n'
+    '  // ── Build stationCode → marker map ──────────────────────────────────\n'
+    '  var markerMap = {};\n'
+    '  mapObj.eachLayer(function(layer) {\n'
+    '    if (!(layer instanceof L.CircleMarker)) return;\n'
+    '    var popup = layer.getPopup();\n'
+    '    if (!popup) return;\n'
+    '    var match = (popup.getContent() || "").match(/data-station="([^"]+)"/);\n'
+    '    if (match) markerMap[match[1]] = layer;\n'
+    '  });\n'
+    '\n'
+    '  // ── Variable toggle ──────────────────────────────────────────────────\n'
+    '  function updateMarkers(variable) {\n'
+    '    Object.keys(markerMap).forEach(function(code) {\n'
+    '      var d = window.stationData[code];\n'
+    '      var varData = d && d[variable];\n'
+    '      var color   = varData ? varData.color   : "#808080";\n'
+    '      var opacity = varData ? 0.85 : 0.55;\n'
+    '      markerMap[code].setStyle({fillColor: color, fillOpacity: opacity});\n'
+    '      if (varData) {\n'
+    '        markerMap[code].setTooltipContent(\n'
+    '          "<div>" + varData.tooltip + "</div>"\n'
+    '        );\n'
+    '      }\n'
+    '    });\n'
+    '    // Update colorbar caption\n'
+    '    var caption = document.querySelector(".caption");\n'
+    '    if (caption) {\n'
+    '      caption.textContent = variable === "swe"\n'
+    '        ? "SWE % of Normal  (values above 200% shown in darkest blue)"\n'
+    '        : "Snow Depth % of Normal  (values above 200% shown in darkest blue)";\n'
+    '    }\n'
+    '  }\n'
+    '\n'
+    '  document.querySelectorAll("input[name=mapVariable]").forEach(function(radio) {\n'
+    '    radio.addEventListener("change", function() {\n'
+    '      if (this.checked) updateMarkers(this.value);\n'
+    '    });\n'
+    '  });\n'
+    '\n'
+    '  // ── Chart rendering ──────────────────────────────────────────────────\n'
+    '  var chartCache = {};\n'
+    '\n'
+    '  function dateToDoWY(dateStr) {\n'
+    '    var d = new Date(dateStr + "T00:00:00");\n'
+    '    var month = d.getMonth() + 1;\n'
+    '    var year = d.getFullYear();\n'
+    '    var wyStart = month >= 10\n'
+    '      ? new Date(year, 9, 1)\n'
+    '      : new Date(year - 1, 9, 1);\n'
+    '    return Math.floor((d - wyStart) / 86400000) + 1;\n'
+    '  }\n'
+    '\n'
+    '  function computeStats(values) {\n'
+    '    if (!values.length) return null;\n'
+    '    var n = values.length;\n'
+    '    var mean = values.reduce(function(a, b) { return a + b; }, 0) / n;\n'
+    '    var variance = values.reduce(function(a, b) { return a + (b-mean)*(b-mean); }, 0) / n;\n'
+    '    var std = Math.sqrt(variance);\n'
+    '    var sorted = values.slice().sort(function(a, b) { return a - b; });\n'
+    '    var mid = Math.floor(sorted.length / 2);\n'
+    '    var median = sorted.length % 2 === 1\n'
+    '      ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;\n'
+    '    return {mean:mean, std:std, median:median, min:sorted[0], max:sorted[sorted.length-1]};\n'
+    '  }\n'
+    '\n'
+    '  function renderSWEChart(stationCode, csvPath, stationName, chartDiv) {\n'
+    '    var variable = document.querySelector("input[name=mapVariable]:checked").value;\n'
+    '    var cacheKey = stationCode + "_" + variable;\n'
+    '    if (chartCache[cacheKey]) {\n'
+    '      Plotly.newPlot(chartDiv, chartCache[cacheKey].traces,\n'
+    '        chartCache[cacheKey].layout, {responsive:true, displayModeBar:false});\n'
+    '      return;\n'
+    '    }\n'
+    '    chartDiv.innerHTML = "<div style=\'padding:20px;text-align:center;color:#666;\'>Loading chart...</div>";\n'
+    '    fetch(csvPath).then(function(resp) {\n'
+    '      if (!resp.ok) throw new Error("CSV not available (HTTP " + resp.status + ")");\n'
+    '      return resp.text();\n'
+    '    }).then(function(text) {\n'
+    '      var parsed = Papa.parse(text, {header:true, dynamicTyping:true, skipEmptyLines:true});\n'
+    '      var rows = parsed.data;\n'
+    '      var col = variable === "swe" ? "WTEQ" : "SNWD";\n'
+    '      var yLabel = variable === "swe" ? "SWE [cm]" : "Snow Depth [cm]";\n'
+    '      var today = new Date();\n'
+    '      var currentWYStart = today.getMonth() >= 9\n'
+    '        ? new Date(today.getFullYear(), 9, 1)\n'
+    '        : new Date(today.getFullYear()-1, 9, 1);\n'
+    '      var historical = {};\n'
+    '      var currentWYX = [], currentWYY = [];\n'
+    '      rows.forEach(function(row) {\n'
+    '        var dateStr = row.datetime || row.date;\n'
+    '        if (!dateStr || row[col] === null || row[col] === undefined || isNaN(row[col])) return;\n'
+    '        var d = new Date(dateStr + "T00:00:00");\n'
+    '        if (isNaN(d.getTime())) return;\n'
+    '        var dowy = dateToDoWY(dateStr);\n'
+    '        var val = row[col] * 100;\n'
+    '        if (d >= currentWYStart) {\n'
+    '          currentWYX.push(dowy); currentWYY.push(val);\n'
+    '        } else {\n'
+    '          if (!historical[dowy]) historical[dowy] = [];\n'
+    '          historical[dowy].push(val);\n'
+    '        }\n'
+    '      });\n'
+    '      var dowys=[],meanArr=[],stdHighArr=[],stdLowArr=[],medianArr=[],minArr=[],maxArr=[];\n'
+    '      for (var i = 1; i <= 366; i++) {\n'
+    '        var vals = historical[i] || [];\n'
+    '        var stats = vals.length >= 3 ? computeStats(vals) : null;\n'
+    '        dowys.push(i);\n'
+    '        meanArr.push(stats ? parseFloat(stats.mean.toFixed(3)) : null);\n'
+    '        stdHighArr.push(stats ? parseFloat((stats.mean+stats.std).toFixed(3)) : null);\n'
+    '        stdLowArr.push(stats ? parseFloat(Math.max(0,stats.mean-stats.std).toFixed(3)) : null);\n'
+    '        medianArr.push(stats ? parseFloat(stats.median.toFixed(3)) : null);\n'
+    '        minArr.push(stats ? parseFloat(stats.min.toFixed(3)) : null);\n'
+    '        maxArr.push(stats ? parseFloat(stats.max.toFixed(3)) : null);\n'
+    '      }\n'
+    '      var traces = [\n'
+    '        {x:dowys.concat(dowys.slice().reverse()),\n'
+    '         y:stdHighArr.concat(stdLowArr.slice().reverse()),\n'
+    '         fill:"toself", fillcolor:"rgba(147,112,219,0.25)",\n'
+    '         line:{color:"transparent"}, name:"mean \u00b11 std",\n'
+    '         type:"scatter", hoverinfo:"skip", showlegend:true},\n'
+    '        {x:dowys,y:minArr,mode:"lines",line:{color:"red",width:1.5},name:"min",type:"scatter",connectgaps:false},\n'
+    '        {x:dowys,y:maxArr,mode:"lines",line:{color:"blue",width:1.5},name:"max",type:"scatter",connectgaps:false},\n'
+    '        {x:dowys,y:meanArr,mode:"lines",line:{color:"purple",width:1.5},name:"mean",type:"scatter",connectgaps:false},\n'
+    '        {x:dowys,y:medianArr,mode:"lines",line:{color:"green",width:1.5},name:"median",type:"scatter",connectgaps:false},\n'
+    '        {x:currentWYX,y:currentWYY,mode:"markers",\n'
+    '         marker:{color:"black",size:5,symbol:"circle"},\n'
+    '         name:"Current WY",type:"scatter"}\n'
+    '      ];\n'
+    '      var layout = {\n'
+    '        title:{text:stationName+" \u2014 "+yLabel+" by DOWY",font:{size:12}},\n'
+    '        xaxis:{title:"Day of Water Year (Oct 1 = Day 1)",range:[0,366],showgrid:true,gridcolor:"#eee"},\n'
+    '        yaxis:{title:yLabel,rangemode:"tozero",showgrid:true,gridcolor:"#eee"},\n'
+    '        legend:{x:0.01,y:0.99,bgcolor:"rgba(255,255,255,0.8)",font:{size:11}},\n'
+    '        margin:{l:55,r:10,t:35,b:45},\n'
+    '        height:280,plot_bgcolor:"white",paper_bgcolor:"white"\n'
+    '      };\n'
+    '      chartCache[cacheKey] = {traces:traces, layout:layout};\n'
+    '      chartDiv.innerHTML = "";\n'
+    '      Plotly.newPlot(chartDiv, traces, layout, {responsive:true, displayModeBar:false});\n'
+    '    }).catch(function(err) {\n'
+    '      chartDiv.innerHTML = "<div style=\'padding:10px;color:#c00;font-size:12px;\'>"\n'
+    '        + "Chart unavailable: " + err.message\n'
+    '        + "<br><small>Charts load when served over HTTP (e.g. GitHub Pages)</small></div>";\n'
+    '    });\n'
+    '  }\n'
+    '\n'
+    '  mapObj.on("popupopen", function(e) {\n'
+    '    var el = e.popup.getElement();\n'
+    '    if (!el) return;\n'
+    '    var stationDiv = el.querySelector("[data-station]");\n'
+    '    if (!stationDiv) return;\n'
+    '    var stationCode = stationDiv.getAttribute("data-station");\n'
+    '    var csvPath     = stationDiv.getAttribute("data-csvpath");\n'
+    '    var stationName = stationDiv.getAttribute("data-stationname");\n'
+    '    var chartDiv    = stationDiv.querySelector(".swe-chart");\n'
+    '    if (!chartDiv || !stationCode || !csvPath) return;\n'
+    '    renderSWEChart(stationCode, csvPath, stationName, chartDiv);\n'
+    '  });\n'
+    '});\n'
+    '</script>'
+).replace('__MAP_NAME__', map_name)
 
 m.get_root().html.add_child(folium.Element(chart_js))
 

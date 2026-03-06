@@ -1,0 +1,20 @@
+name: snotel_ccss_env
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.11
+  - requests
+  - pandas
+  - numpy
+  - geopandas
+  - pyarrow
+  - folium
+  - ipykernel
+  - fsspec
+  - mgrs
+  - matplotlib-base
+  - lxml
+  - tqdm
+  - earthengine-api
+  - pip
